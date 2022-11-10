@@ -7,6 +7,7 @@ import argparse
 from PIL import Image
 import numpy as np
 import pandas as pd
+import wandb
 
 import torch
 import torch.nn as nn
@@ -20,7 +21,7 @@ eps = sys.float_info.epsilon
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--aff_path', type=str, default='datasets/AfectNet/', help='AfectNet dataset path.')
+    parser.add_argument('--aff_path', type=str, default='datasets/AffectNet/', help='AffectNet dataset path.')
     parser.add_argument('--batch_size', type=int, default=256, help='Batch size.')
     parser.add_argument('--lr', type=float, default=0.0001, help='Initial learning rate for adam.')
     parser.add_argument('--workers', default=8, type=int, help='Number of data loading workers.')
@@ -55,6 +56,7 @@ class AffectNet(data.Dataset):
         _, self.sample_counts = np.unique(self.label, return_counts=True)
         # print(f' distribution of {phase} samples: {self.sample_counts}')
 
+    # 若要對其他資料集進行訓練，可不用 get_df
     def get_df(self):
         train_path = os.path.join(self.aff_path,'train_set/')
         val_path = os.path.join(self.aff_path,'val_set/')
@@ -179,7 +181,18 @@ def run_training():
     model = DAN(num_class=args.num_class, num_head=args.num_head)
     model.to(device)
 
-        
+    # Initial Wandb
+    wandb_config={
+            "Dataset" : "AffectNet",
+            "Epoch" : args.epochs,
+            "Learning_Rate" : args.lr,
+            "Batch Size" : args.batch_size,
+            "Model" : "resnet18_msceleb",
+            }
+    wandb.init(project="DAN Facial Expression Recognition", name=f"lr{args.lr}_b{args.batch_size}", config=wandb_config)
+
+    wandb.watch(model, log_freq=100)
+
     data_transforms = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.RandomHorizontalFlip(),
@@ -267,6 +280,8 @@ def run_training():
 
         acc = correct_sum.float() / float(train_dataset.__len__())
         running_loss = running_loss/iter_cnt
+
+        train_acc, train_loss = acc, running_loss
         tqdm.write('[Epoch %d] Training accuracy: %.4f. Loss: %.3f. LR %.6f' % (epoch, acc, running_loss,optimizer.param_groups[0]['lr']))
         
         with torch.no_grad():
@@ -296,8 +311,12 @@ def run_training():
             acc = bingo_cnt.float()/float(sample_cnt)
             acc = np.around(acc.numpy(),4)
             best_acc = max(acc,best_acc)
+
+            valid_acc, valid_loss = acc, running_loss
+
             tqdm.write("[Epoch %d] Validation accuracy:%.4f. Loss:%.3f" % (epoch, acc, running_loss))
             tqdm.write("best_acc:" + str(best_acc))
+            wandb.log({"Train Accuracy": train_acc, "Train Loss" : train_loss, "Valid Accuracy" : valid_acc, "Valid Loss" : valid_loss})
 
             if args.num_class == 7 and  acc > 0.65:
                 torch.save({'iter': epoch,
@@ -306,11 +325,11 @@ def run_training():
                             os.path.join('checkpoints', "affecnet7_epoch"+str(epoch)+"_acc"+str(acc)+".pth"))
                 tqdm.write('Model saved.')
 
-            elif args.num_class == 8 and  acc > 0.62:
+            elif args.num_class == 8 and  acc > 0.61:
                 torch.save({'iter': epoch,
                             'model_state_dict': model.state_dict(),
                              'optimizer_state_dict': optimizer.state_dict(),},
-                            os.path.join('checkpoints', "affecnet8_epoch"+str(epoch)+"_acc"+str(acc)+".pth"))
+                            os.path.join('checkpoints', "affecnet8_epoch"+str(epoch)+"_batch"+str(args.batch_size)+"_acc"+str(acc)+".pth"))
                 tqdm.write('Model saved.')
      
         
