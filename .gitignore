@@ -3,3 +3,5 @@
 /wandb
 /models
 *.pyc
+/dataset_process/dataset
+/dataset_process/LIRIS
