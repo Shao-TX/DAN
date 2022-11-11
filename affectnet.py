@@ -13,6 +13,7 @@ import torch
 import torch.nn as nn
 import torch.utils.data as data
 from torchvision import transforms, datasets
+from torchsummary import summary
 
 from networks.dan import DAN
 
@@ -21,13 +22,14 @@ eps = sys.float_info.epsilon
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--aff_path', type=str, default='datasets/AffectNet/', help='AffectNet dataset path.')
+    parser.add_argument('--aff_path', type=str, default='datasets/', help='AffectNet dataset path.')
     parser.add_argument('--batch_size', type=int, default=256, help='Batch size.')
     parser.add_argument('--lr', type=float, default=0.0001, help='Initial learning rate for adam.')
-    parser.add_argument('--workers', default=8, type=int, help='Number of data loading workers.')
+    parser.add_argument('--workers', default=1, type=int, help='Number of data loading workers.')
     parser.add_argument('--epochs', type=int, default=40, help='Total training epochs.')
     parser.add_argument('--num_head', type=int, default=4, help='Number of attention head.')
     parser.add_argument('--num_class', type=int, default=8, help='Number of class.')
+    parser.add_argument('--finetune', type=str, default="True", help='Finetune liner layer')
 
     return parser.parse_args()
 
@@ -167,6 +169,13 @@ class ImbalancedDatasetSampler(data.sampler.Sampler):
     def __len__(self):
         return self.num_samples
 
+# Set Random Seed
+def Set_Seed(myseed = 1520):
+    np.random.seed(myseed)
+
+    torch.manual_seed(myseed)
+    torch.cuda.manual_seed(myseed)
+    torch.cuda.manual_seed_all(myseed)
 
 def run_training():
     args = parse_args()
@@ -178,70 +187,61 @@ def run_training():
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.enabled = True
 
-    model = DAN(num_class=args.num_class, num_head=args.num_head)
+    model = DAN(num_class=args.num_class, num_head=args.num_head, pretrained=True)
     model.to(device)
+
+    if(args.finetune == "True"):
+        print("Finetune : ", args.finetune)
+        for name, param in model.named_parameters():
+            if name not in ["fc.weight", "fc.bias"]:
+                param.requires_grad = False
+                
+            print("name: ", name)
+            print("requires_grad: ", param.requires_grad)
+
+    # print(model)
+    summary(model, (3, 224, 224))
 
     # Initial Wandb
     wandb_config={
-            "Dataset" : "AffectNet",
+            "Dataset" : "LIRIS",
             "Epoch" : args.epochs,
             "Learning_Rate" : args.lr,
             "Batch Size" : args.batch_size,
             "Model" : "resnet18_msceleb",
+            "Finetune" : args.finetune,
             }
-    wandb.init(project="DAN Facial Expression Recognition", name=f"lr{args.lr}_b{args.batch_size}", config=wandb_config)
+    wandb.init(project="DAN Children Facial Expression Recognition", name=f"lr_{args.lr}_b_{args.batch_size}_ft_{args.finetune}", config=wandb_config)
 
     wandb.watch(model, log_freq=100)
 
     data_transforms = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomApply([
-                transforms.RandomAffine(20, scale=(0.8, 1), translate=(0.2, 0.2)),
-            ], p=0.7),
-
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225]),
-        transforms.RandomErasing(),
-        ])
+                                        transforms.Resize((224, 224)),
+                                        transforms.RandomHorizontalFlip(),
+                                        transforms.RandomApply([transforms.RandomAffine(20, scale=(0.8, 1), translate=(0.2, 0.2)),], p=0.7),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                                        transforms.RandomErasing(),
+                                        ])
     
+    data_transforms_val = transforms.Compose([
+                                            transforms.Resize((224, 224)),
+                                            transforms.ToTensor(),
+                                            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                                            ])      
+                                                                      
     # train_dataset = AffectNet(args.aff_path, phase = 'train', transform = data_transforms)   # loading dynamically
+    # valid_dataset = AffectNet(args.aff_path, phase = 'val', transform = data_transforms_val)  # loading dynamically
 
     train_dataset = datasets.ImageFolder(f'{args.aff_path}/train', transform = data_transforms)   # loading statically
-    if args.num_class == 7:   # ignore the 8-th class
-        idx = [i for i in range(len(train_dataset)) if train_dataset.imgs[i][1] != 7]
-        train_dataset = data.Subset(train_dataset, idx)
+    valid_dataset = datasets.ImageFolder(f'{args.aff_path}/valid', transform = data_transforms_val)    # loading statically
 
     print('Whole train set size:', train_dataset.__len__())
-    train_loader = torch.utils.data.DataLoader(train_dataset,
-                                               batch_size = args.batch_size,
-                                               num_workers = args.workers,
-                                               sampler=ImbalancedDatasetSampler(train_dataset),
-                                               shuffle = False, 
-                                               pin_memory = True)
+    print('Validation set size:', valid_dataset.__len__())
+    print('分類標籤對應 : ', train_dataset.class_to_idx)
 
-    data_transforms_val = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])])      
-                                                                      
-    # val_dataset = AffectNet(args.aff_path, phase = 'val', transform = data_transforms_val)  # loading dynamically
-
-    val_dataset = datasets.ImageFolder(f'{args.aff_path}/val', transform = data_transforms_val)    # loading statically
-    if args.num_class == 7:   # ignore the 8-th class 
-        idx = [i for i in range(len(val_dataset)) if val_dataset.imgs[i][1] != 7]
-        val_dataset = data.Subset(val_dataset, idx)
-
-    print('Validation set size:', val_dataset.__len__())
-    
-    val_loader = torch.utils.data.DataLoader(val_dataset,
-                                               batch_size = args.batch_size,
-                                               num_workers = args.workers,
-                                               shuffle = False,  
-                                               pin_memory = True)
-
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size = args.batch_size, num_workers = args.workers, sampler=ImbalancedDatasetSampler(train_dataset), shuffle = False, pin_memory = True)
+    valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size = args.batch_size, num_workers = args.workers, shuffle = False, pin_memory = True)    
 
     criterion_cls = torch.nn.CrossEntropyLoss().to(device)
     criterion_af = AffinityLoss(device, num_class=args.num_class)
@@ -250,7 +250,6 @@ def run_training():
     params = list(model.parameters()) + list(criterion_af.parameters())
     optimizer = torch.optim.Adam(params,args.lr,weight_decay = 0)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma = 0.6)
-
     
     best_acc = 0
     for epoch in tqdm(range(1, args.epochs + 1)):
@@ -290,7 +289,7 @@ def run_training():
             bingo_cnt = 0
             sample_cnt = 0
             model.eval()
-            for imgs, targets in val_loader:
+            for imgs, targets in valid_loader:
         
                 imgs = imgs.to(device)
                 targets = targets.to(device)
@@ -318,14 +317,7 @@ def run_training():
             tqdm.write("best_acc:" + str(best_acc))
             wandb.log({"Train Accuracy": train_acc, "Train Loss" : train_loss, "Valid Accuracy" : valid_acc, "Valid Loss" : valid_loss})
 
-            if args.num_class == 7 and  acc > 0.65:
-                torch.save({'iter': epoch,
-                            'model_state_dict': model.state_dict(),
-                             'optimizer_state_dict': optimizer.state_dict(),},
-                            os.path.join('checkpoints', "affecnet7_epoch"+str(epoch)+"_acc"+str(acc)+".pth"))
-                tqdm.write('Model saved.')
-
-            elif args.num_class == 8 and  acc > 0.61:
+            if(acc > 0.61):
                 torch.save({'iter': epoch,
                             'model_state_dict': model.state_dict(),
                              'optimizer_state_dict': optimizer.state_dict(),},
@@ -333,5 +325,6 @@ def run_training():
                 tqdm.write('Model saved.')
      
         
-if __name__ == "__main__":                    
+if __name__ == "__main__":
+    Set_Seed()
     run_training()
