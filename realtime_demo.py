@@ -1,9 +1,9 @@
+import cv2
 import dlib
-import cv2
-
-from PIL import Image
 import numpy as np
-import cv2
+from PIL import Image
+
+import argparse
 
 import torch
 from torchvision import transforms
@@ -11,21 +11,29 @@ from torchvision import transforms
 from networks.dan import DAN
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--checkpoint', type=str, default="liris_epoch10_batch256_acc0.9636", help='Checkpoint name.')
+
+    return parser.parse_args()
 
 class Model():
-    def __init__(self):
+    def __init__(self, checkpoint_path):
+        if('liris' in checkpoint_path):
+            num_class = 5
+            self.labels = ['disgust', 'fear', 'happy', 'sad', 'surprise']
+        else:
+            num_class = 8
+            self.labels = ['neutral', 'happy', 'sad', 'surprise', 'fear', 'disgust', 'anger', 'contempt']
+        
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.data_transforms = transforms.Compose([
-                                    transforms.Resize((224, 224)),
-                                    transforms.ToTensor(),
-                                    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                    std=[0.229, 0.224, 0.225])
-                                ])
-        self.labels = ['neutral', 'happy', 'sad', 'surprise', 'fear', 'disgust', 'anger', 'contempt']
-
-        self.model = DAN(num_head=4, num_class=8, pretrained=False)
-        checkpoint = torch.load('./checkpoints/pre_trained_affecnet8_epoch5_acc0.6209.pth',
-            map_location=self.device)
+                                                transforms.Resize((224, 224)),
+                                                transforms.ToTensor(),
+                                                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                                                ])
+        self.model = DAN(num_head=4, num_class=num_class, pretrained=False)
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
         self.model.load_state_dict(checkpoint['model_state_dict'],strict=True)
         self.model.to(self.device)
         self.model.eval()
@@ -47,11 +55,14 @@ class Model():
             return label
 
 if __name__ == "__main__":
-    detector = dlib.get_frontal_face_detector()
+    args = parse_args()
 
+    checkpoint_path = "./checkpoints/" + args.checkpoint + ".pth"
+
+    detector = dlib.get_frontal_face_detector()
     cap = cv2.VideoCapture(0)
 
-    model = Model()
+    model = Model(checkpoint_path=checkpoint_path)
 
     while True:
         ret, frame = cap.read()
