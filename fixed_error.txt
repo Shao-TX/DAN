@@ -1,0 +1,25 @@
+(1)
+Traceback (most recent call last):
+  File "run_grad_cam.py", line 95, in <module>
+    eigen_smooth=False)
+  File "F:\Anaconda\envs\myenv\lib\site-packages\pytorch_grad_cam\base_cam.py", line 129, in __call__
+    target_category, eigen_smooth)
+  File "F:\Anaconda\envs\myenv\lib\site-packages\pytorch_grad_cam\base_cam.py", line 65, in forward
+    target_category = np.argmax(output.cpu().data.numpy(), axis=-1)
+AttributeError: 'tuple' object has no attribute 'cpu'
+
+# Fixed :
+            (1) Error   : 'tuple' object has no attribute 'cpu'
+            (2) Fix     : Using output[0] to replace output
+
+(2)
+Traceback (most recent call last):
+  File "run_grad_cam.py", line 106, in <module>
+    gb = gb_model(input_tensor, target_category=target_category)
+  File "F:\Anaconda\envs\myenv\lib\site-packages\pytorch_grad_cam\guided_backprop.py", line 66, in __call__
+    target_category = np.argmax(output.cpu().data.numpy())
+AttributeError: 'tuple' object has no attribute 'cpu'
+
+# Fixed :
+            (1) Error   : 'tuple' object has no attribute 'cpu'
+            (2) Fix     : Using output[0] to replace output
