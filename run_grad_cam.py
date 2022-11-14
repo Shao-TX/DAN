@@ -62,8 +62,8 @@ if __name__ == '__main__':
     # }
 
     ## visualize by DAN model
-    model = DAN(num_class=7, num_head=4)
-    checkpoint = torch.load('./checkpoints/epoch21_acc0.897_bacc0.8532.pth')
+    model = DAN(num_class=5, num_head=4)
+    checkpoint = torch.load('./checkpoints/liris_epoch1_batch8_acc0.6157.pth')
     model.load_state_dict(checkpoint['model_state_dict'],strict=True) 
     names = {
         'our_head0':model.cat_head0.sa,
@@ -74,38 +74,40 @@ if __name__ == '__main__':
     }
     
     ## select part of test data to gen
-    for p in glob.glob('./datasets/raf-basic/Image/aligned/test*.jpg')[100:300]:
-        for name,target_layer in names.items():
-            cam = methods['gradcam++'](model=model,
-                            target_layer=target_layer,
-                            use_cuda=True)
+    # for p in glob.glob('./datasets/LIRIS/cut_image/valid/disgust/1.jpg')[100:300]:
+    p = './datasets/LIRIS/cut_image/valid/disgust/1.jpg'
+    for name,target_layer in names.items():
+        cam = methods['gradcam++'](model=model,
+                        target_layer=target_layer,
+                        use_cuda=True)
 
-            rgb_img = cv2.imread(p, 1)[:, :, ::-1]
-            rgb_img = np.float32(rgb_img) / 255
-            input_tensor = preprocess_image(rgb_img, mean=[0.485, 0.456, 0.406], 
-                                                    std=[0.229, 0.224, 0.225])
+        rgb_img = cv2.imread(p, 1)[:, :, ::-1]
+        rgb_img = np.float32(rgb_img) / 255
+        input_tensor = preprocess_image(rgb_img, mean=[0.485, 0.456, 0.406], 
+                                                std=[0.229, 0.224, 0.225])
 
-            target_category = None
-            cam.batch_size = 32
+        target_category = None
+        cam.batch_size = 32
 
-            grayscale_cam = cam(input_tensor=input_tensor,
-                                target_category=target_category,
-                                aug_smooth=False,
-                                eigen_smooth=False)
+        grayscale_cam = cam(input_tensor=input_tensor,
+                            target_category=target_category,
+                            aug_smooth=False,
+                            eigen_smooth=False)
 
-            # Here grayscale_cam has only one image in the batch
-            grayscale_cam = grayscale_cam[0, :]
+        # Here grayscale_cam has only one image in the batch
+        grayscale_cam = grayscale_cam[0, :]
 
-            cam_image = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
+        cam_image = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
 
-            # cam_image is RGB encoded whereas "cv2.imwrite" requires BGR encoding.
-            cam_image = cv2.cvtColor(cam_image, cv2.COLOR_RGB2BGR)
+        # cam_image is RGB encoded whereas "cv2.imwrite" requires BGR encoding.
+        cam_image = cv2.cvtColor(cam_image, cv2.COLOR_RGB2BGR)
 
-            gb_model = GuidedBackpropReLUModel(model=model, use_cuda=True)
-            gb = gb_model(input_tensor, target_category=target_category)
+        gb_model = GuidedBackpropReLUModel(model=model, use_cuda=True)
+        gb = gb_model(input_tensor, target_category=target_category)
 
-            cam_mask = cv2.merge([grayscale_cam, grayscale_cam, grayscale_cam])
-            cam_gb = deprocess_image(cam_mask * gb)
-            gb = deprocess_image(gb)
+        cam_mask = cv2.merge([grayscale_cam, grayscale_cam, grayscale_cam])
+        cam_gb = deprocess_image(cam_mask * gb)
+        gb = deprocess_image(gb)
+        cv2.imwrite(f'./cam_result/{os.path.basename(p)}_{name}_cam.jpg', cam_image)
 
-            cv2.imwrite(f'./cam_result/{os.path.basename(p)}_{name}_cam.jpg', cam_image)
+    print("Save Images")
