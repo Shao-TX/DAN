@@ -5,3 +5,5 @@
 *.pyc
 /dataset_process/dataset
 /dataset_process/LIRIS
+/dataset_process/angelic-bee-323206-91fcd6b54e96.json
+/cam_result
