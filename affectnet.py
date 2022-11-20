@@ -211,7 +211,7 @@ def run_training():
             "Model" : "resnet18_msceleb",
             "Finetune" : args.finetune,
             }
-    wandb.init(project="DAN Children Facial Expression Recognition", name=f"lr_{args.lr}_b_{args.batch_size}_ft_{args.finetune}", config=wandb_config)
+    wandb.init(project="DAN Data Cleaning Children Facial Expression Recognition", name=f"lr_{args.lr}_b_{args.batch_size}_ft_{args.finetune}", config=wandb_config)
 
     wandb.watch(model, log_freq=100)
 
@@ -317,11 +317,11 @@ def run_training():
             tqdm.write("best_acc:" + str(best_acc))
             wandb.log({"Train Accuracy": train_acc, "Train Loss" : train_loss, "Valid Accuracy" : valid_acc, "Valid Loss" : valid_loss})
 
-            if(acc > 0.61):
+            if(acc == best_acc):
                 torch.save({'iter': epoch,
                             'model_state_dict': model.state_dict(),
                              'optimizer_state_dict': optimizer.state_dict(),},
-                            os.path.join('checkpoints', "affecnet8_epoch"+str(epoch)+"_batch"+str(args.batch_size)+"_acc"+str(acc)+".pth"))
+                            os.path.join('checkpoints', "LIRIS_epoch"+str(epoch)+"_batch"+str(args.batch_size)+"_acc"+str(acc)+".pth"))
                 tqdm.write('Model saved.')
      
         
