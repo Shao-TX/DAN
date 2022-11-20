@@ -14,16 +14,19 @@ from networks.dan import DAN
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--checkpoint', type=str, default="liris_epoch10_batch256_acc0.9636", help='Checkpoint name.')
+    parser.add_argument('--num_class', type=int, default=6, help='Number of class.')
 
     return parser.parse_args()
 
 class Model():
-    def __init__(self, checkpoint_path):
-        if('liris' in checkpoint_path):
-            num_class = 5
+    def __init__(self, num_class, checkpoint_path):
+        if(num_class == 4):
+            self.labels = ['happy', 'normal', 'sad', 'surprise']
+        elif(num_class == 5):
             self.labels = ['disgust', 'fear', 'happy', 'sad', 'surprise']
-        else:
-            num_class = 8
+        elif(num_class == 6):
+            self.labels = ['disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
+        elif(num_class == 8):
             self.labels = ['neutral', 'happy', 'sad', 'surprise', 'fear', 'disgust', 'anger', 'contempt']
         
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -58,11 +61,12 @@ if __name__ == "__main__":
     args = parse_args()
 
     checkpoint_path = "./checkpoints/" + args.checkpoint + ".pth"
+    num_class = args.num_class
 
     detector = dlib.get_frontal_face_detector()
     cap = cv2.VideoCapture(0)
 
-    model = Model(checkpoint_path=checkpoint_path)
+    model = Model(num_class=num_class, checkpoint_path=checkpoint_path)
 
     while True:
         ret, frame = cap.read()
