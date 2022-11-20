@@ -7,7 +7,7 @@ import cv2
 
 emotion = input("Emotion : ")
 
-original_path = "LIRIS\\cut_image\\" + emotion + "\\"
+original_path = "LIRIS\\training_data\\split_cut_myself_image\\train\\" + emotion + "\\"
 ids = next(os.walk(original_path))[2] # => ('LIRIS\\train\\disgust\\', [],[image.jpg ...])
 a = len(ids)
 b = 0.2 * a
@@ -25,7 +25,11 @@ for n, img_id in tqdm(enumerate(result)):
     img_name = img_id + ".jpg"
     img_path = os.path.join(original_path, img_name)
 
-    img = cv2.imread(img_path) # 讀取原圖位置
-    cv2.imwrite("LIRIS\\cut_image\\valid\\" + emotion + "\\" + img_id + ".jpg", img) # 存放到新的位置
+    try :
+        img = cv2.imread(img_path) # 讀取原圖位置
+        cv2.imwrite("LIRIS\\training_data\\split_cut_myself_image\\valid\\" + emotion + "\\" + img_id + ".jpg", img) # 存放到新的位置
 
-    os.remove(img_path)
+        os.remove(img_path)
+
+    except :
+        pass

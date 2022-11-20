@@ -9,9 +9,9 @@ if __name__ == "__main__":
     detector = dlib.get_frontal_face_detector()
     emotion = input("Emotion : ")
 
-    folder_path = "LIRIS\\image\\" + emotion
+    folder_path = "LIRIS\\training_data\\myself_image\\" + emotion
     ids = next(os.walk(folder_path + "\\"))[2] # => ('LIRIS\\train\\disgust\\', [],[image.jpg ...])
-    save_path = "LIRIS\\cut_image\\" + emotion + "\\"
+    save_path = "LIRIS\\training_data\\cut_myself_image\\" + emotion + "\\"
 
     for id, img_path in tqdm(enumerate(ids)):
         id = str(id)

@@ -1,8 +1,6 @@
 import cv2
 import os
 
-video_classes = ["disgust", "fear", "happy", "sad", "surprise"]
-
 def file_count(dir):
     file_list = []
     for file_name in os.listdir(dir):
@@ -10,8 +8,8 @@ def file_count(dir):
 
     return file_list
 
-def cut(file_name, emotion):
-    file_path = os.path.join("dataset", "video", emotion, file_name)
+def cut(file_name, dir, emotion):
+    file_path = os.path.join(dir, file_name)
     cap = cv2.VideoCapture(file_path)
     i = 1
     while(True):
@@ -23,7 +21,7 @@ def cut(file_name, emotion):
 
         save_name = file_name.split('.')
         save_name =  save_name[0] + "_" + str(i)  + ".jpg"
-        save_path = os.path.join("dataset", "image", emotion, save_name)
+        save_path = os.path.join("LIRIS", "training_data", "cut_myself_image", emotion, save_name)
 
         cv2.imwrite(save_path, frame)
         i = i + 1
@@ -33,9 +31,9 @@ def cut(file_name, emotion):
 
 if __name__ == "__main__":
     emotion = input("Emotion : ")
-    dir = "dataset/video/" + emotion
+    dir = "LIRIS\\training_data\\myself_video\\" + emotion
     file_list = file_count(dir)
 
     for file_name in file_list:
         print(file_name)
-        cut(file_name, emotion)
+        cut(file_name, dir, emotion)
