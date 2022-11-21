@@ -7,6 +7,7 @@ import os
 import glob
 import cv2
 import numpy as np
+import argparse
 import torch
 import torch.nn as nn
 from torchvision import models
@@ -42,9 +43,23 @@ class DaclModel(nn.Module):
         feat, output, A = self.model(x)
         return output
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--checkpoint', type=str, default="LIRIS_epoch8_batch8_acc0.9958", help='Checkpoint name.')
+    parser.add_argument('--num_class', type=int, default=6, help='Number of class.')
+    parser.add_argument('--img_path', type=str, default='img.jpg', help="Image path")
+
+    return parser.parse_args()
+
 if __name__ == '__main__':
+    args = parse_args()
+
+    num_class = args.num_class
+    img_path = "./cam_result/" + args.img_path
+    checkpoint_path = "./checkpoints/" + args.checkpoint + ".pth"
 
     os.makedirs('cam_result', exist_ok=True)
+    os.makedirs(f'cam_result/{args.checkpoint}', exist_ok=True)
 
     methods = \
         {"gradcam": GradCAM,
@@ -62,8 +77,8 @@ if __name__ == '__main__':
     # }
 
     ## visualize by DAN model
-    model = DAN(num_class=5, num_head=4)
-    checkpoint = torch.load('./checkpoints/liris_epoch1_batch8_acc0.6157.pth')
+    model = DAN(num_class=num_class, num_head=4)
+    checkpoint = torch.load(checkpoint_path)
     model.load_state_dict(checkpoint['model_state_dict'],strict=True) 
     names = {
         'our_head0':model.cat_head0.sa,
@@ -75,7 +90,7 @@ if __name__ == '__main__':
     
     ## select part of test data to gen
     # for p in glob.glob('./datasets/LIRIS/cut_image/valid/disgust/1.jpg')[100:300]:
-    p = './datasets/LIRIS/cut_image/valid/disgust/1.jpg'
+    p = img_path
     for name,target_layer in names.items():
         cam = methods['gradcam++'](model=model,
                         target_layer=target_layer,
@@ -108,6 +123,8 @@ if __name__ == '__main__':
         cam_mask = cv2.merge([grayscale_cam, grayscale_cam, grayscale_cam])
         cam_gb = deprocess_image(cam_mask * gb)
         gb = deprocess_image(gb)
-        cv2.imwrite(f'./cam_result/{os.path.basename(p)}_{name}_cam.jpg', cam_image)
+
+        cv2.imwrite(f'./cam_result/{args.checkpoint}/{args.img_path}_{name}_cam.jpg', cam_image)
+        # cv2.imshow("v", cam_image)
 
     print("Save Images")
