@@ -187,7 +187,16 @@ def run_training():
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.enabled = True
 
-    model = DAN(num_class=args.num_class, num_head=args.num_head, pretrained=True)
+    model = DAN(num_class=8, num_head=args.num_head, pretrained=False)
+
+    # Load pre-trained model of DAN => Not Resnet
+    checkpoint = torch.load("./checkpoints/pre_trained_affecnet8_epoch5_acc0.6209.pth")
+    model.load_state_dict(checkpoint['model_state_dict'],strict=True)
+
+    # Modified class from 8 to 6
+    model.fc = nn.Linear(512, args.num_class)
+    model.bn = nn.BatchNorm1d(args.num_class)
+    
     model.to(device)
 
     if(args.finetune == "True"):
@@ -208,7 +217,7 @@ def run_training():
             "Epoch" : args.epochs,
             "Learning_Rate" : args.lr,
             "Batch Size" : args.batch_size,
-            "Model" : "resnet18_msceleb",
+            "Model" : "pre_trained_affecnet8_epoch5_acc0.6209.pth",
             "Finetune" : args.finetune,
             }
     wandb.init(project="DAN Data Cleaning Children Facial Expression Recognition", name=f"lr_{args.lr}_b_{args.batch_size}_ft_{args.finetune}", config=wandb_config)
