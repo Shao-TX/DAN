@@ -29,7 +29,7 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=40, help='Total training epochs.')
     parser.add_argument('--num_head', type=int, default=4, help='Number of attention head.')
     parser.add_argument('--num_class', type=int, default=8, help='Number of class.')
-    parser.add_argument('--finetune', type=str, default="True", help='Finetune liner layer')
+    parser.add_argument('--finetune', type=str, default="False", help='Finetune liner layer')
 
     return parser.parse_args()
 
@@ -193,7 +193,7 @@ def run_training():
     checkpoint = torch.load("./checkpoints/pre_trained_affecnet8_epoch5_acc0.6209.pth")
     model.load_state_dict(checkpoint['model_state_dict'],strict=True)
 
-    # Modified class from 8 to 6
+    # Modified linear class from 8 to 6
     model.fc = nn.Linear(512, args.num_class)
     model.bn = nn.BatchNorm1d(args.num_class)
     
@@ -219,8 +219,9 @@ def run_training():
             "Batch Size" : args.batch_size,
             "Model" : "pre_trained_affecnet8_epoch5_acc0.6209.pth",
             "Finetune" : args.finetune,
+            "Split Proportion" : "Train : Valid : Test => 8 : 1 : 1"
             }
-    wandb.init(project="DAN Data Cleaning Children Facial Expression Recognition", name=f"lr_{args.lr}_b_{args.batch_size}_ft_{args.finetune}", config=wandb_config)
+    wandb.init(project="DAN Data Cleaning Children Facial Expression Recognition", name=f"lr_{args.lr}_batch_{args.batch_size}", config=wandb_config)
 
     wandb.watch(model, log_freq=100)
 
@@ -260,6 +261,7 @@ def run_training():
     optimizer = torch.optim.Adam(params,args.lr,weight_decay = 0)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma = 0.6)
     
+    os.makedirs('checkpoints\\LIRIS\\Batch_' + str(args.batch_size) + '\\LR-' + str(args.lr), exist_ok=True)
     best_acc = 0
     for epoch in tqdm(range(1, args.epochs + 1)):
         running_loss = 0.0
@@ -326,14 +328,15 @@ def run_training():
             tqdm.write("best_acc:" + str(best_acc))
             wandb.log({"Train Accuracy": train_acc, "Train Loss" : train_loss, "Valid Accuracy" : valid_acc, "Valid Loss" : valid_loss})
 
-            if(acc == best_acc):
+            if(acc >= best_acc):
                 torch.save({'iter': epoch,
                             'model_state_dict': model.state_dict(),
                              'optimizer_state_dict': optimizer.state_dict(),},
-                            os.path.join('checkpoints', "LIRIS_epoch"+str(epoch)+"_batch"+str(args.batch_size)+"_acc"+str(acc)+".pth"))
+                            os.path.join('checkpoints', "LIRIS\\Batch_" + str(args.batch_size),'LR-' + str(args.lr), "Epoch-"+ str(epoch)+ "_Acc-"+str(acc)+".pth"))
                 tqdm.write('Model saved.')
      
         
 if __name__ == "__main__":
+    
     Set_Seed()
     run_training()
